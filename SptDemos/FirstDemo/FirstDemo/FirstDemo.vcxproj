@@ -143,6 +143,7 @@
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="FirstDemo.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FirstDemo.cpp" />

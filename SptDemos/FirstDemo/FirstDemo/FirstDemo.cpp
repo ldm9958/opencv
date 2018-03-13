@@ -5,11 +5,8 @@
 #include <windows.h>
 #include <shlwapi.h>
 #include <string>
+#include "FirstDemo.h"
 #include "highgui.h"
-
-#define IMG_1	"..\\..\\data\\州哥.jpg"
-#define L_IMG_1	L"..\\..\\data\\州哥.jpg"
-#define TITLE	"州哥是条狗"
 
 std::wstring str2wstr(const std::string wstrSrc, UINT CodePage = CP_UTF8)
 {
@@ -32,28 +29,56 @@ std::wstring str2wstr(const std::string wstrSrc, UINT CodePage = CP_UTF8)
 	return retn;
 }
 
+int ShowImage(std::string strImagePath,const std::string strTitle)
+{
+	IplImage * img = cvLoadImage(strImagePath.c_str());
+	cvNamedWindow(strTitle.c_str(), CV_WINDOW_AUTOSIZE);
+	cvShowImage(strTitle.c_str(), img);
+	cvWaitKey(0);
+	cvReleaseImage(&img);
+	cvDestroyWindow(strTitle.c_str());
+	return E_SUCCESS;
+}
+
+int PlayMovie(std::string strMoviePath,std::string strTitle)
+{
+	if (!PathFileExists(str2wstr(strMoviePath).c_str()))
+	{
+		::MessageBox(0, 0, L"File doesn't exist!!",0);
+		return E_FILE_NOT_EXIST;
+	}
+	cvNamedWindow(strTitle.c_str(), CV_WINDOW_AUTOSIZE);
+	CvCapture * capture = cvCreateFileCapture(strMoviePath.c_str());
+	IplImage * frame;
+	while (TRUE)
+	{
+		frame = cvQueryFrame(capture);
+		if (frame == NULL)
+		{
+			::MessageBox(0, 0, L"Finished!", 0);
+			break;
+		}
+		cvShowImage(strTitle.c_str(), frame);
+		char c = cvWaitKey(33);
+		if (c == 27)
+		{
+			break;
+		}		
+	}
+
+	cvReleaseCapture(&capture);
+	cvDestroyWindow(strTitle.c_str());
+
+	return E_SUCCESS;
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
 	using namespace std;
 	string strTemp = IMG_1;
-
-	//if (!PathFileExists(L_IMG_1))
-	//{
-	//	::MessageBox(0, 0, L"File doesn't exist111!", 0);
-	//	strTemp.insert(0,"..\\");
-	//	if (!PathFileExists(str2wstr(strTemp).c_str()))
-	//	{
-	//		::MessageBox(0, 0, L"File doesn't exist222!", 0);
-	//		return -1;
-	//	}		
-	//}
-
-	IplImage * img = cvLoadImage(strTemp.c_str());
-	cvNamedWindow(TITLE, CV_WINDOW_AUTOSIZE);
-	cvShowImage(TITLE, img);
-	cvWaitKey(0);
-	cvReleaseImage(&img);
-	cvDestroyWindow(TITLE);
-
+	
+//	ShowImage(strTemp,TITLE);
+	
+	PlayMovie(MOVIE_1, "小电影");
 	return 0;
 }
