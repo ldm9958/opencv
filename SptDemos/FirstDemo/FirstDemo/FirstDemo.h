@@ -9,3 +9,4 @@
 #define L_IMG_1	L"..\\..\\data\\州哥.jpg"
 #define TITLE	"州哥是条狗"
 #define MOVIE_1 "..\\..\\data\\test.avi"
+#define DIGITS	"..\\..\\..\\samples\\data\\digits.png"
