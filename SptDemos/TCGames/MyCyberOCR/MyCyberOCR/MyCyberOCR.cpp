@@ -7,32 +7,36 @@
 #include <windows.h>
 #include <iostream>
 #include <math.h>
+#include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv/highgui.h"
 #include "Common.h"
+#include <fstream>
 
 using namespace std;
 using namespace cv;
 
-std::string wstr2str( const std::wstring wstrSrc, UINT CodePage/*=CP_ACP CP_UTF8*/)
+#define PI		3.14159265
+
+std::string wstr2str(const std::wstring wstrSrc, UINT CodePage/*=CP_ACP CP_UTF8*/)
 {
-	if(wstrSrc.length() == 0)
+	if (wstrSrc.length() == 0)
 		return "";
 
 	//得到转化后需要Buf的长度
 	std::string retn = "";
 	try
 	{
-		int buflen = ::WideCharToMultiByte( CodePage, 0, wstrSrc.c_str(), -1, NULL, 0, NULL, NULL ) + 1;
-		if(buflen == 0)
+		int buflen = ::WideCharToMultiByte(CodePage, 0, wstrSrc.c_str(), -1, NULL, 0, NULL, NULL) + 1;
+		if (buflen == 0)
 			return "";
 		char * buf = new char[buflen];
-		if(buf != NULL)
+		if (buf != NULL)
 		{
-			memset(buf,0,  buflen );
-			::WideCharToMultiByte( CodePage, 0, wstrSrc.c_str(), -1, buf, buflen, NULL, NULL );
+			memset(buf, 0, buflen);
+			::WideCharToMultiByte(CodePage, 0, wstrSrc.c_str(), -1, buf, buflen, NULL, NULL);
 			retn = buf;
-			delete []buf;
+			delete[]buf;
 		}
 	}
 	catch (...)
@@ -43,44 +47,42 @@ std::string wstr2str( const std::wstring wstrSrc, UINT CodePage/*=CP_ACP CP_UTF8
 
 }
 
-void GetFoldAllDecFile( wstring strFold,vector<wstring> &vecFile,wstring strTarget)
+void GetFoldAllDecFile(wstring strFold, vector<wstring> &vecFile, wstring strTarget)
 {
-	wstring strFind = strFold + L"\\*.*";
+	wstring strFind = strFold + L"\\*.txt";
 	WIN32_FIND_DATA FileData;
 	DWORD dwAttrs = 0;
-	HANDLE hFind=::FindFirstFile(strFind.c_str(),&FileData);
+	HANDLE hFind = ::FindFirstFile(strFind.c_str(), &FileData);
 
 
-	while(INVALID_HANDLE_VALUE != hFind)
+	while (INVALID_HANDLE_VALUE != hFind)
 	{
 		wstring str(FileData.cFileName);
 		wstring strTemp = strFold + L"\\" + FileData.cFileName;
 
 		dwAttrs = ::GetFileAttributes(strTemp.c_str());
-		if (INVALID_FILE_ATTRIBUTES == dwAttrs )
+		if (INVALID_FILE_ATTRIBUTES == dwAttrs)
 		{
 		}
 		else if (dwAttrs & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			if ( (0 != wcscmp(FileData.cFileName,L"."))&&(0 != wcscmp(FileData.cFileName,L"..")))
+			if ((0 != wcscmp(FileData.cFileName, L".")) && (0 != wcscmp(FileData.cFileName, L"..")))
 			{
-				GetFoldAllDecFile(strTemp,vecFile,strTarget);
+				GetFoldAllDecFile(strTemp, vecFile, strTarget);
 			}
 		}
 		else
 		{
-			if (strFold.find(strTarget) != string::npos)
-			{
-				vecFile.push_back(strTemp);
-			}
+			wcout << L"add file " << strTemp.c_str() << endl;
+			vecFile.push_back(strTemp);
 		}
 
-		if (!::FindNextFile(hFind, &FileData)) 
+		if (!::FindNextFile(hFind, &FileData))
 		{
 			break;
 		}
 	}
-	if ( INVALID_HANDLE_VALUE != hFind)
+	if (INVALID_HANDLE_VALUE != hFind)
 	{
 		::FindClose(hFind);
 		hFind = INVALID_HANDLE_VALUE;
@@ -111,20 +113,28 @@ std::wstring str2wstr(const std::string wstrSrc, UINT CodePage = CP_UTF8)
 
 int ScreenShotImgByPlots(std::string strImgPath, double iPlotA_x, double iPlotA_y, double iPlotB_x, double iPlotB_y, double iPlotC_x, double iPlotC_y, double iPlotD_x, double iPlotD_y)
 {
-	if (!::PathFileExists(str2wstr(strImgPath,CP_UTF8).c_str()))
+	if (!::PathFileExists(str2wstr(strImgPath, CP_ACP).c_str()))
 	{
-		std::cout << "File" << strImgPath.c_str() << "doesn't exist!!" <<std::endl;
+		std::cout << "File" << strImgPath.c_str() << "doesn't exist!!" << std::endl;
 		return ERROR_FILE_NOT_EXIST;
 	}
+	int iXmin = MIN(MIN(MIN(iPlotA_x, iPlotB_x), iPlotC_x), iPlotD_x);
+	int iXmax = MAX(MAX(MAX(ceil(iPlotA_x), ceil(iPlotB_x)), ceil(iPlotC_x)), ceil(iPlotD_x));
+	int iYmin = MIN(MIN(MIN(iPlotA_y, iPlotB_y), iPlotC_y), iPlotD_y);
+	int iYmax = MAX(MAX(MAX(ceil(iPlotA_y), ceil(iPlotB_y)), ceil(iPlotC_y)), ceil(iPlotD_y));
 
-	int iLength,iHeight		= 0;
-	double DeltaX,DeltaY	= 0.0;
-	IplImage *imgShot = 0;
-	BOOL bNeedTrans			= FALSE;
+	cout << "iXmin = " << iXmin << "iXmax = " << iXmax << "iYmin = " << iYmin << "iYMax = " << iYmax << endl;
+	int iLength, iHeight = 0;
+	double DeltaX, DeltaY = 0.0;
+	Mat imgShot;
+	BOOL bNeedTrans = FALSE;	
 
 	//计算生成的图片长与宽
-	iLength = (int)sqrt((iPlotA_x - iPlotD_x)*(iPlotA_x - iPlotD_x) + (iPlotA_y - iPlotD_y)*(iPlotA_y - iPlotD_y));		
+	iLength = (int)sqrt((iPlotA_x - iPlotD_x)*(iPlotA_x - iPlotD_x) + (iPlotA_y - iPlotD_y)*(iPlotA_y - iPlotD_y));
 	iHeight = (int)sqrt((iPlotA_x - iPlotB_x)*(iPlotA_x - iPlotB_x) + (iPlotA_y - iPlotB_y)*(iPlotA_y - iPlotB_y));
+
+	Rect roi = Rect(iXmin, iYmin, iXmax - iXmin, iYmax - iYmin);
+	cout << "height" << roi.height << "width" << roi.width << endl;
 	cout << "iLength=" << iLength << "  iHeight=" << iHeight << endl;
 
 	if (iLength == 0 || iHeight == 0)
@@ -134,41 +144,26 @@ int ScreenShotImgByPlots(std::string strImgPath, double iPlotA_x, double iPlotA_
 	}
 
 	//对应X轴Y轴偏移量。
-	DeltaX = (iPlotD_x - iPlotA_x) / iLength;																			
+	DeltaX = (iPlotD_x - iPlotA_x) / iLength;
 	DeltaY = (iPlotD_y - iPlotA_y) / iHeight;
 
 	cout << "DeltaX=" << DeltaX << "  DeltaY=" << DeltaY << endl;
 	do
-	{
-		IplImage * img = cvLoadImage(strImgPath.c_str());
-		std::cout << "width" << img->width << "height" << img->height << std::endl;		 
-		imgShot = cvCreateImage( cvSize(iLength, iHeight), img->depth, img->nChannels );  
-		 // 将3通道转换为1通道
-		int nl = imgShot->width *3 ;
-		if (-0.05 < DeltaX < 0.05)				//增量太小就按标准矩阵处理。
-		{
+	{	
+		Mat img = imread(strImgPath.c_str());
+		Mat roiImg = img(roi);
 
-		}
-		else if (-0.05 < DeltaY < 0.05)
-		{
-			bNeedTrans = TRUE;
-		}
+		Point center = Point(roiImg.cols / 2, roiImg.rows / 2);
+		double angle = atan((iPlotD_y-iPlotA_y)/(iPlotD_x-iPlotA_x))*180/PI;
+		double scale = 1;
+		Mat rot_mat = getRotationMatrix2D(center, angle, scale);
+		warpAffine(roiImg, roiImg, rot_mat, roiImg.size());
 
-		for (int k = 0; k < nr; k++)
-		{
-			// 每一行图像的指针
-			for (int i = 0; i < nl; i++)
-			{
-			//	CV_MAT_ELEM(imgShot, Mat, k, i) = (img->imageData + (int)floor(k + DeltaY*k)*img->widthStep)[(int)floor(i + DeltaX*i)];
-			//	cout << "row = " << (int)floor(iPlotA_x + DeltaY*k) << "col = " << (int)floor(iPlotA_y + DeltaX*i) <<"widthstep= " <<img->widthStep << endl;
-			//	imgShot->at<Mat>(i,k) = (img->imageData + (int)floor(iPlotA_x + DeltaY*k))[(int)floor(iPlotA_y + DeltaX*i)];
-			}
-			break;
-		}		
-		
+		imwrite("D://my.jpg", roiImg);
+
 	} while (FALSE);
+	::MessageBox(0, 0,L"hello", 0);
 
-	cvSaveImage("my.jpg", imgShot);  
 }
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -176,25 +171,43 @@ int _tmain(int argc, _TCHAR* argv[])
 	wstring strPath = L"";
 	vector<wstring> vecAllFile;
 	vecAllFile.clear();
-	if (argv[0])
+	if (argv[1])
 	{
-		strPath = argv[0];
+		strPath = argv[1];
+	}
+	else
+	{
+		strPath = L"F:\\spt\\学习资料\\ml\\train_1000\\txt_1000";
 	}
 	string strTarget = ".txt";
-	cout << "Scan all " << strTarget.c_str() << "files in " << wstr2str(strPath,CP_ACP).c_str() << endl;
-	GetFoldAllDecFile(strPath,vecAllFile,str2wstr(strTarget,CP_UTF8));
-	
+	cout << "Scan all " << strTarget.c_str() << "files in " << wstr2str(strPath, CP_ACP).c_str() << endl;
+	GetFoldAllDecFile(strPath, vecAllFile, str2wstr(strTarget, CP_UTF8));
+
 	cout << "Scan finished , find " << vecAllFile.size() << "files totally.." << endl;
 	if (vecAllFile.size() == 0)
 	{
 		return -1;
 	}
 	vector<wstring>::iterator iter = vecAllFile.begin();
-	int k =1;
-	for (;iter!=vecAllFile.end();iter++,k++)
-	{
+	int k = 1;
+	ifstream ifile;
+	string line;
+	int i;
+	for (; iter != vecAllFile.end(); iter++, k++)
+	{		
+		i = 1;
+		ifile.open(wstr2str(*iter,CP_ACP).c_str());
+		cout << "Open " << k <<" file " << wstr2str(*iter,CP_ACP).c_str() <<endl;
 		
+		while (std::getline(ifile, line)) {
+			cout << i << "line" <<endl;
+			cout << line << endl;
+			i++;
+		}
+		cout << "Load " << k <<" file end" << wstr2str(*iter,CP_ACP).c_str() <<endl;
+		ifile.close();
 	}
+//	ScreenShotImgByPlots("F:\\spt\\学习资料\\ml\\train_1000\\image_1000\\TB1..FLLXXXXXbCXpXXunYpLFXX.jpg", 407.6, 413.6, 407.6, 425.6, 598.0, 411.2, 600.4, 397.6);
 	system("pause ");
 	return 0;
 }
